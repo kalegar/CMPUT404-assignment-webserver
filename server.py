@@ -2,6 +2,21 @@
 import socketserver
 import os
 
+# Copyright 2020 Andrew Smith
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+#
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,9 +42,12 @@ import os
 
 # try: curl -v -X GET http://127.0.0.1:8080/
 
-RESPONSE_404 = """HTTP/1.1 404 Not Found
-Content-Type: text/html; charset=UTF-8\r\n
-<html> 
+RESPONSE_404_HEADERS = """HTTP/1.1 404 Not Found
+Content-Type: text/html; charset=UTF-8
+Content-Length: {}
+
+"""
+RESPONSE_404_BODY="""<html> 
   <head> 
     <title>404 Not Found</title> 
   </head> 
@@ -38,10 +56,14 @@ Content-Type: text/html; charset=UTF-8\r\n
    </body> 
 </html>
 """
+RESPONSE_404=RESPONSE_404_HEADERS.format(len(RESPONSE_404_BODY.encode('utf-8')))+RESPONSE_404_BODY
 
-RESPONSE_405 = """HTTP/1.1 405 Method Not Allowed
-Content-Type: text/html; charset=UTF-8\r\n
-<html> 
+RESPONSE_405_HEADERS = """HTTP/1.1 405 Method Not Allowed
+Content-Type: text/html; charset=UTF-8
+Content-Length: {}
+
+"""
+RESPONSE_405_BODY = """<html> 
   <head> 
     <title>Method Not Allowed</title> 
   </head> 
@@ -50,6 +72,7 @@ Content-Type: text/html; charset=UTF-8\r\n
    </body> 
 </html>
 """
+RESPONSE_405 = RESPONSE_405_HEADERS.format(len(RESPONSE_405_BODY.encode('utf-8')))+RESPONSE_405_BODY
 
 RESPONSE_301 = """HTTP/1.1 301 Moved Permanently
 Location: {}\r\n
@@ -66,11 +89,13 @@ class MyWebServer(socketserver.BaseRequestHandler):
             name, ext = os.path.splitext(path)
             f = open('www'+path, 'r')
             header = "HTTP/1.1 200 OK\r\n"
-            header += "Content-Type: text/"+ext[1:]+"; charset=UTF-8\r\n\r\n"
-            data = header
+            header += "Content-Type: text/"+ext[1:]+"; charset=UTF-8\r\n"
+            header += "Content-Length: {}\r\n\r\n"
+            data = ""
             for line in f:
                 data = data + line
-            self.request.sendall(bytearray(data,'utf-8'))
+            msg = header.format(len(data.encode('utf-8'))) + data
+            self.request.sendall(bytearray(msg,'utf-8'))
         except IOError:
             if os.path.isdir('www'+path):
                 data = RESPONSE_301.format("http://127.0.0.1:8080"+path+"/")

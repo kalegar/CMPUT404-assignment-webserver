@@ -1,5 +1,6 @@
 #  coding: utf-8 
 import socketserver
+import os
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
@@ -26,13 +27,69 @@ import socketserver
 
 # try: curl -v -X GET http://127.0.0.1:8080/
 
+RESPONSE_404 = """HTTP/1.1 404 Not Found
+Content-Type: text/html; charset=UTF-8\r\n
+<html> 
+  <head> 
+    <title>404 Not Found</title> 
+  </head> 
+  <body> 
+    <h1>404 Not Found</h1>
+   </body> 
+</html>
+"""
+
+RESPONSE_405 = """HTTP/1.1 405 Method Not Allowed
+Content-Type: text/html; charset=UTF-8\r\n
+<html> 
+  <head> 
+    <title>Method Not Allowed</title> 
+  </head> 
+  <body> 
+    <h1>405 Method Not Allowed</h1>
+   </body> 
+</html>
+"""
+
+RESPONSE_301 = """HTTP/1.1 301 Moved Permanently
+Location: {}\r\n
+"""
 
 class MyWebServer(socketserver.BaseRequestHandler):
     
     def handle(self):
         self.data = self.request.recv(1024).strip()
-        print ("Got a request of: %s\n" % self.data)
-        self.request.sendall(bytearray("OK",'utf-8'))
+        self.parseRequest()
+
+    def servePage(self,path):
+        try:
+            name, ext = os.path.splitext(path)
+            f = open('www'+path, 'r')
+            header = "HTTP/1.1 200 OK\r\n"
+            header += "Content-Type: text/"+ext[1:]+"; charset=UTF-8\r\n\r\n"
+            data = header
+            for line in f:
+                data = data + line
+            self.request.sendall(bytearray(data,'utf-8'))
+        except IOError:
+            if os.path.isdir('www'+path):
+                data = RESPONSE_301.format("http://127.0.0.1:8080"+path+"/")
+                self.request.sendall(bytearray(data,'utf-8'))
+            else:
+                self.request.sendall(bytearray(RESPONSE_404,'utf-8'))
+
+    def parseRequest(self):
+        lines = self.data.split(b'\r\n')
+        for line in lines:
+            data = line.split(b' ')
+            if b'GET' in data[0]:
+                dir = data[1].decode('utf-8').replace('..','')
+                if dir[-1:] == '/':
+                    self.servePage(dir+'index.html')
+                else:
+                    self.servePage(dir)
+            elif b'POST' in data[0] or b'PUT' in data[0] or b'DELETE' in data[0]:
+                self.request.sendall(bytearray(RESPONSE_405,'utf-8'))
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
